@@ -185,15 +185,21 @@
         function handleAuth() {
             const provider = new firebase.auth.GoogleAuthProvider();
             provider.addScope('https://www.googleapis.com/auth/drive.readonly');
+            
+            // Используем редирект вместо всплывающего окна для планшетов
+            firebase.auth().signInWithRedirect(provider);
+        }
 
-            firebase.auth().signInWithPopup(provider).then((result) => {
+        // Проверяем результат авторизации после возвращения на страницу
+        firebase.auth().getRedirectResult().then((result) => {
+            if (result.credential) {
                 accessToken = result.credential.accessToken;
                 document.getElementById('status-msg').style.display = 'none';
                 loadDriveFolders();
-            }).catch((error) => {
-                alert("Ошибка входа: " + error.message);
-            });
-        }
+            }
+        }).catch((error) => {
+            alert("Ошибка входа: " + error.message);
+        });
 
         async function loadDriveFolders() {
             const feed = document.getElementById('feed');
