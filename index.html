@@ -6,7 +6,6 @@
     <link rel="manifest" href="manifest.json">
     <title>Masterclass Viewer</title>
     
-    <!-- Google OAuth 2.0 Client -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <style>
@@ -19,9 +18,7 @@
             --secondary-text: #7f91a4;
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         body {
             margin: 0;
@@ -45,16 +42,9 @@
             flex-shrink: 0;
         }
 
-        .title {
-            font-weight: bold;
-            font-size: 1.1rem;
-        }
+        .title { font-weight: bold; font-size: 1.1rem; }
 
-        .controls {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
+        .controls { display: flex; gap: 10px; align-items: center; }
 
         .lang-toggle {
             background: #242f3d;
@@ -113,6 +103,16 @@
             cursor: pointer;
             font-size: 1rem;
         }
+
+        .back-btn {
+            background: #38495c;
+            color: #fff;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
@@ -130,7 +130,7 @@
 
     <div id="feed">
         <div class="message-card" id="status-msg">
-            <div id="ui-welcome">Нажмите «Войти», чтобы предоставить доступ к Google Диску.</div>
+            <div id="ui-welcome">Нажмите «Войти», чтобы открыть файлы с Google Диска.</div>
         </div>
     </div>
 
@@ -143,16 +143,20 @@
             de: {
                 title: "Masterclass Viewer",
                 login: "Anmelden",
+                logout: "Angemeldet",
                 welcome: "Klicken Sie auf «Anmelden», um auf Google Drive zuzugreifen.",
                 loading: "Lade Dateien...",
-                empty: "Keine Ordner auf Google Drive gefunden."
+                empty: "Keine Ordner oder Dateien gefunden.",
+                back: "← Zurück"
             },
             ru: {
                 title: "Мастер-классы Telegram",
                 login: "Войти",
-                welcome: "Нажмите «Войти», чтобы предоставить доступ к Google Диску.",
+                logout: "Вы вошли",
+                welcome: "Нажмите «Войти», чтобы открыть файлы с Google Диска.",
                 loading: "Загрузка файлов...",
-                empty: "Папки на Google Диске не найдены."
+                empty: "Ничего не найдено.",
+                back: "← Назад"
             }
         };
 
@@ -161,7 +165,11 @@
         function switchLanguage(lang) {
             currentLang = lang;
             document.getElementById('ui-title').innerText = i18n[lang].title;
-            document.getElementById('btn-login').innerText = i18n[lang].login;
+            if (!accessToken) {
+                document.getElementById('btn-login').innerText = i18n[lang].login;
+            } else {
+                document.getElementById('btn-login').innerText = i18n[lang].logout;
+            }
             document.getElementById('ui-welcome').innerText = i18n[lang].welcome;
         }
 
@@ -172,8 +180,9 @@
                 callback: (tokenResponse) => {
                     if (tokenResponse && tokenResponse.access_token) {
                         accessToken = tokenResponse.access_token;
+                        document.getElementById('btn-login').innerText = i18n[currentLang].logout;
                         document.getElementById('status-msg').style.display = 'none';
-                        loadDriveFolders();
+                        loadDriveContents('root');
                     }
                 },
             });
@@ -185,64 +194,54 @@
             }
         }
 
-        async function loadDriveFolders() {
+        async function loadDriveContents(folderId, parentId = null) {
             const feed = document.getElementById('feed');
             feed.innerHTML = `<div>${i18n[currentLang].loading}</div>`;
 
             try {
-                // Ищем абсолютно все папки на Google Диске (включая вложенные)
-                const response = await fetch("https://www.googleapis.com/drive/v3/files?q=mimeType='application/vnd.google-apps.folder'+and+trashed=false&fields=files(id, name)", {
-                    headers: { 'Authorization': 'Bearer ' + accessToken }
-                });
-                const data = await response.json();
-
-                feed.innerHTML = '';
-                if (data.files && data.files.length > 0) {
-                    data.files.forEach(folder => {
-                        const btn = document.createElement('button');
-                        btn.className = 'folder-btn';
-                        btn.innerText = '📁 ' + folder.name;
-                        btn.onclick = () => loadFolderContents(folder.id);
-                        feed.appendChild(btn);
-                    });
-                } else {
-                    feed.innerHTML = `<div>${i18n[currentLang].empty}</div>`;
-                }
-            } catch (err) {
-                feed.innerHTML = `<div>Ошибка: ${err.message}</div>`;
-            }
-        }
-
-        async function loadFolderContents(folderId) {
-            const feed = document.getElementById('feed');
-            feed.innerHTML = `<div>${i18n[currentLang].loading}</div>`;
-
-            try {
+                // Запрашиваем элементы текущей папки
                 const response = await fetch(`https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id, name, mimeType)`, {
                     headers: { 'Authorization': 'Bearer ' + accessToken }
                 });
                 const data = await response.json();
 
                 feed.innerHTML = '';
+
+                if (parentId) {
+                    const backBtn = document.createElement('button');
+                    backBtn.className = 'back-btn';
+                    backBtn.innerText = i18n[currentLang].back;
+                    backBtn.onclick = () => loadDriveContents(parentId);
+                    feed.appendChild(backBtn);
+                }
+
                 if (data.files && data.files.length > 0) {
                     data.files.forEach(file => {
-                        const card = document.createElement('div');
-                        card.className = 'message-card';
-
-                        if (file.mimeType.startsWith('image/')) {
-                            card.innerHTML = `<b>${file.name}</b><br><img src="https://www.googleapis.com/drive/v3/files/${file.id}?alt=media" headers="Authorization: Bearer ${accessToken}">`;
-                        } else if (file.mimeType.startsWith('video/')) {
-                            card.innerHTML = `<b>${file.name}</b><br><video controls src="https://www.googleapis.com/drive/v3/files/${file.id}?alt=media"></video>`;
+                        if (file.mimeType === 'application/vnd.google-apps.folder') {
+                            const btn = document.createElement('button');
+                            btn.className = 'folder-btn';
+                            btn.innerText = '📁 ' + file.name;
+                            btn.onclick = () => loadDriveContents(file.id, folderId);
+                            feed.appendChild(btn);
                         } else {
-                            card.innerHTML = `<b>📄 ${file.name}</b>`;
+                            const card = document.createElement('div');
+                            card.className = 'message-card';
+
+                            if (file.mimeType.startsWith('image/')) {
+                                card.innerHTML = `<b>${file.name}</b><br><img src="https://www.googleapis.com/drive/v3/files/${file.id}?alt=media" headers="Authorization: Bearer ${accessToken}">`;
+                            } else if (file.mimeType.startsWith('video/')) {
+                                card.innerHTML = `<b>${file.name}</b><br><video controls src="https://www.googleapis.com/drive/v3/files/${file.id}?alt=media"></video>`;
+                            } else {
+                                card.innerHTML = `<b>📄 ${file.name}</b>`;
+                            }
+                            feed.appendChild(card);
                         }
-                        feed.appendChild(card);
                     });
                 } else {
                     feed.innerHTML = `<div>${i18n[currentLang].empty}</div>`;
                 }
             } catch (err) {
-                feed.innerHTML = `<div>Ошибка содержимого: ${err.message}</div>`;
+                feed.innerHTML = `<div>Ошибка: ${err.message}</div>`;
             }
         }
     </script>
