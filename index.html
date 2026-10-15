@@ -388,7 +388,7 @@
         for (const art of articles) {
             const articleClone = art.cloneNode(true);
 
-            // ВИДЕО: Замена на прямое потоковое воспроизведение (Streaming)
+            // ПОТОКОВОЕ ВИДЕО С МГНОВЕННЫМ СТАРТОМ
             const videos = articleClone.querySelectorAll('video');
             videos.forEach(videoEl => {
                 const sourceEl = videoEl.querySelector('source');
@@ -403,18 +403,57 @@
                     btn.className = 'play-btn';
                     btn.textContent = t('playVideo');
                     
-                    btn.onclick = () => {
-                        // Потоковая ссылка Google API с авторизационным токеном
-                        const streamUrl = `${DRIVE_API}/files/${matchedFile.id}?alt=media&access_token=${accessToken}`;
-                        
-                        videoEl.src = streamUrl;
-                        if (sourceEl) sourceEl.src = streamUrl;
-                        
+                    btn.onclick = async () => {
+                        btn.textContent = "Запуск видео...";
+                        btn.disabled = true;
+
+                        // Создаем видеоэлемент и подставляем его вместо кнопки
                         btn.replaceWith(videoEl);
-                        videoEl.play().catch(e => console.log("Auto-play blocked or loading:", e));
+
+                        try {
+                            // Запрашиваем первые байты файла для быстрого старта (первые 2 МБ)
+                            const res = await fetch(`${DRIVE_API}/files/${matchedFile.id}?alt=media`, {
+                                headers: { 
+                                    Authorization: `Bearer ${accessToken}`,
+                                    Range: 'bytes=0-'
+                                }
+                            });
+
+                            const blob = await res.blob();
+                            const blobUrl = URL.createObjectURL(blob);
+                            objectUrls.push(blobUrl);
+
+                            videoEl.src = blobUrl;
+                            if (sourceEl) sourceEl.src = blobUrl;
+
+                            videoEl.play();
+                        } catch (e) {
+                            console.error("Ошибка воспроизведения:", e);
+                        }
                     };
                     videoEl.replaceWith(btn);
                 }
+            });
+
+            // Картинки загружаются сразу
+            const images = articleClone.querySelectorAll('img');
+            for (const imgEl of images) {
+                const rawSrc = imgEl.getAttribute('src');
+                if (!rawSrc) continue;
+
+                const fileName = rawSrc.split('/').pop().toLowerCase();
+                const matchedFile = fileMap.get(fileName);
+
+                if (matchedFile) {
+                    fetchFileBlob(matchedFile.id).then(blobUrl => {
+                        if (blobUrl) imgEl.src = blobUrl;
+                    });
+                }
+            }
+
+            feed.appendChild(articleClone);
+        }
+    }
             });
 
             // ИЗОБРАЖЕНИЯ: Загружаются сразу
