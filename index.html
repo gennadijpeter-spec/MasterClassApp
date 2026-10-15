@@ -4,11 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="manifest" href="manifest.json">
-    <title>Masterclass Telegram Viewer</title>
+    <title>Masterclass Viewer</title>
     
-    <!-- Google Identity Services & Google API -->
+    <!-- Google One Tap / Official Sign-In -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="https://apis.google.com/js/api.js"></script>
 
     <style>
         :root {
@@ -38,7 +37,6 @@
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid #000;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
 
         .title {
@@ -50,20 +48,6 @@
             display: flex;
             gap: 10px;
             align-items: center;
-        }
-
-        button {
-            background-color: #2b5278;
-            color: #fff;
-            border: none;
-            padding: 8px 14px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 500;
-        }
-
-        button:hover {
-            background-color: #386899;
         }
 
         .lang-toggle {
@@ -92,7 +76,6 @@
             background-color: var(--msg-bg);
             border-radius: 12px;
             padding: 12px 16px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
             word-wrap: break-word;
         }
 
@@ -108,6 +91,15 @@
             text-align: left;
             margin: 4px 0;
             background: #202b36;
+            color: #fff;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        #g_id_onload {
+            margin-top: 15px;
         }
     </style>
 </head>
@@ -116,7 +108,6 @@
     <header>
         <div class="title" id="ui-title">Masterclass Viewer</div>
         <div class="controls">
-            <button id="btn-login" onclick="handleAuth()">Войти / Anmelden</button>
             <select class="lang-toggle" id="lang-select" onchange="switchLanguage(this.value)">
                 <option value="de">DE 🇩🇪</option>
                 <option value="ru" selected>RU 🇷🇺</option>
@@ -126,30 +117,41 @@
 
     <div id="feed">
         <div class="message-card" id="status-msg">
-            <div id="ui-welcome">Авторизуйтесь через Google, чтобы открыть мастер-классы с вашего Google Диска.</div>
+            <div id="ui-welcome">Выберите ваш аккаунт Google для входа:</div>
+            
+            <!-- Официальная кнопка входа Google -->
+            <div id="g_id_onload"
+                 data-client_id="811107839225-fnvskc6g3edktnhlv69h5rd5k9s82bfa.apps.googleusercontent.com"
+                 data-context="signin"
+                 data-ux_mode="popup"
+                 data-callback="handleCredentialResponse"
+                 data-auto_prompt="false">
+            </div>
+
+            <div class="g_id_signin"
+                 data-type="standard"
+                 data-shape="rectangular"
+                 data-theme="outline"
+                 data-text="signin_with"
+                 data-size="large"
+                 data-logo_alignment="left">
+            </div>
         </div>
     </div>
 
     <script>
-        // ВСТАВЬТЕ СВАЙ КЛЮЧ Client ID В КАВЫЧКИ НИЖЕ:
-        const CLIENT_ID = "811107839225-fnvskc6g3edktnhlv69h5rd5k9s82bfa.apps.googleusercontent.com"; 
-        const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
-
-        let tokenClient;
         let accessToken = null;
 
         const i18n = {
             de: {
                 title: "Masterclass Viewer",
-                login: "Mit Google anmelden",
-                welcome: "Bitte melden Sie sich an, um Ihre Google Drive-Dateien anzusehen.",
+                welcome: "Bitte melden Sie sich mit Ihrem Google-Konto an:",
                 loading: "Lade Dateien...",
                 empty: "Keine Inhalte gefunden."
             },
             ru: {
                 title: "Мастер-классы Telegram",
-                login: "Войти через Google",
-                welcome: "Пожалуйста, авторизуйтесь для доступа к Google Диску.",
+                welcome: "Выберите ваш аккаунт Google для входа:",
                 loading: "Загрузка файлов...",
                 empty: "В этой папке ничего не найдено."
             }
@@ -160,32 +162,249 @@
         function switchLanguage(lang) {
             currentLang = lang;
             document.getElementById('ui-title').innerText = i18n[lang].title;
-            document.getElementById('btn-login').innerText = i18n[lang].login;
             document.getElementById('ui-welcome').innerText = i18n[lang].welcome;
         }
 
-        window.onload = function () {
-            tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: SCOPES,
-                callback: (response) => {
-                    if (response.error) {
-                        alert("Ошибка входа: " + response.error);
-                        return;
-                    }
-                    accessToken = response.access_token;
-                    document.getElementById('status-msg').style.display = 'none';
-                    loadDriveFolders();
+        function handleCredentialResponse(response) {
+            // Получаем токен авторизации напрямую
+            accessToken = response.credential;
+            document.getElementById('status-msg').style.display = 'none';
+            loadDriveFolders();
+        }
+
+        async function loadDriveFolders() {
+            const feed = document.getElementById('feed');
+            feed.innerHTML = `<div>${i18n[currentLang].loading}</div>`;
+
+            try {
+                const response = await fetch("https://www.googleapis.com/drive/v3/files?q=mimeType='application/vnd.google-apps.folder'&fields=files(id, name)", {
+                    headers: { 'Authorization': 'Bearer ' + accessToken }
+                });
+                const data = await response.json();
+
+                feed.innerHTML = '';
+                if (data.files && data.files.length > 0) {
+                    data.files.forEach(folder => {
+                        const btn = document.createElement('button');
+                        btn.className = 'folder-btn';
+                        btn.innerText = '📁 ' + folder.name;
+                        btn.onclick = () => loadFolderContents(folder.id);
+                        feed.appendChild(btn);
+                    });
+                } else {
+                    feed.innerHTML = `<div>${i18n[currentLang].empty}</div>`;
                 }
-            });
+            } catch (err) {
+                feed.innerHTML = `<div>Ошибка загрузки: ${err.message}</div>`;
+            }
+        }
+
+        async function loadFolderContents(folderId) {
+            const feed = document.getElementById('feed');
+            feed.innerHTML = `<div>${i18n[currentLang].loading}</div>`;
+
+            try {
+                const response = await fetch(`https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&fields=files(id, name, mimeType)`, {
+                    headers: { 'Authorization': 'Bearer ' + accessToken }
+                });
+                const data = await response.json();
+
+                feed.innerHTML = '';
+                if (data.files && data.files.length > 0) {
+                    data.files.forEach(file => {
+                        const card = document.createElement('div');
+                        card.className = 'message-card';
+
+                        if (file.mimeType.startsWith('image/')) {
+                            card.innerHTML = `<b>${file.name}</b><br><img src="https://www.googleapis.com/drive/v3/files/${file.id}?alt=media" crossorigin="anonymous">`;
+                        } else if (file.mimeType.startsWith('video/')) {
+                            card.innerHTML = `<b>${file.name}</b><br><video controls src="https://www.googleapis.com/drive/v3/files/${file.id}?alt=media" crossorigin="anonymous"></video>`;
+                        } else {
+                            card.innerHTML = `<b>📄 ${file.name}</b>`;
+                        }
+                        feed.appendChild(card);
+                    });
+                } else {
+                    feed.innerHTML = `<div>${i18n[currentLang].empty}</div>`;
+                }
+            } catch (err) {
+                feed.innerHTML = `<div>Ошибка содержимого: ${err.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <title>Masterclass Viewer</title>
+    
+    <!-- Google One Tap / Official Sign-In -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <style>
+        :root {
+            --bg-color: #0e1621;
+            --header-bg: #17212b;
+            --msg-bg: #182533;
+            --text-color: #f5f5f5;
+            --accent-color: #64b5f6;
+            --secondary-text: #7f91a4;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background-color: var(--header-bg);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #000;
+        }
+
+        .title {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .lang-toggle {
+            background: #242f3d;
+            border: 1px solid #38495c;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        #feed {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .message-card {
+            background-color: var(--msg-bg);
+            border-radius: 12px;
+            padding: 12px 16px;
+            word-wrap: break-word;
+        }
+
+        .message-card img, .message-card video {
+            max-width: 100%;
+            border-radius: 8px;
+            margin-top: 8px;
+            display: block;
+        }
+
+        .folder-btn {
+            width: 100%;
+            text-align: left;
+            margin: 4px 0;
+            background: #202b36;
+            color: #fff;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        #g_id_onload {
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="title" id="ui-title">Masterclass Viewer</div>
+        <div class="controls">
+            <select class="lang-toggle" id="lang-select" onchange="switchLanguage(this.value)">
+                <option value="de">DE 🇩🇪</option>
+                <option value="ru" selected>RU 🇷🇺</option>
+            </select>
+        </div>
+    </header>
+
+    <div id="feed">
+        <div class="message-card" id="status-msg">
+            <div id="ui-welcome">Выберите ваш аккаунт Google для входа:</div>
+            
+            <!-- Официальная кнопка входа Google -->
+            <div id="g_id_onload"
+                 data-client_id="811107839225-fnvskc6g3edktnhlv69h5rd5k9s82bfa.apps.googleusercontent.com"
+                 data-context="signin"
+                 data-ux_mode="popup"
+                 data-callback="handleCredentialResponse"
+                 data-auto_prompt="false">
+            </div>
+
+            <div class="g_id_signin"
+                 data-type="standard"
+                 data-shape="rectangular"
+                 data-theme="outline"
+                 data-text="signin_with"
+                 data-size="large"
+                 data-logo_alignment="left">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let accessToken = null;
+
+        const i18n = {
+            de: {
+                title: "Masterclass Viewer",
+                welcome: "Bitte melden Sie sich mit Ihrem Google-Konto an:",
+                loading: "Lade Dateien...",
+                empty: "Keine Inhalte gefunden."
+            },
+            ru: {
+                title: "Мастер-классы Telegram",
+                welcome: "Выберите ваш аккаунт Google для входа:",
+                loading: "Загрузка файлов...",
+                empty: "В этой папке ничего не найдено."
+            }
         };
 
-        function handleAuth() {
-            if (tokenClient) {
-                tokenClient.requestAccessToken({prompt: 'consent'});
-            } else {
-                alert("Google API еще загружается, попробуйте через секунду.");
-            }
+        let currentLang = 'ru';
+
+        function switchLanguage(lang) {
+            currentLang = lang;
+            document.getElementById('ui-title').innerText = i18n[lang].title;
+            document.getElementById('ui-welcome').innerText = i18n[lang].welcome;
+        }
+
+        function handleCredentialResponse(response) {
+            // Получаем токен авторизации напрямую
+            accessToken = response.credential;
+            document.getElementById('status-msg').style.display = 'none';
+            loadDriveFolders();
         }
 
         async function loadDriveFolders() {
