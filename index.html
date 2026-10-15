@@ -232,7 +232,6 @@
             }
         });
 
-        // Если токен сохранен — пробуем автоматически открыть главную
         if (accessToken) {
             updateLoginButton();
             loadHome();
@@ -250,7 +249,6 @@
             return;
         }
         
-        // Запрашиваем вход без принудительного окна согласия каждый раз
         tokenClient.requestAccessToken({ prompt: "" });
     }
 
@@ -268,7 +266,6 @@
     async function driveRequest(url) {
         const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
         if (response.status === 401) {
-            // Токен истек — просим авторизоваться заново
             accessToken = null;
             localStorage.removeItem("gdrive_token");
             updateLoginButton();
@@ -373,7 +370,6 @@
         }
     }
 
-    // БЫСТРЫЙ РЕНДЕР С ЛЕНИВОЙ ЗАГРУЗКОЙ ВИДЕО
     async function renderMasterclassFeed(htmlFileId, folderFiles) {
         const feed = document.getElementById("feed");
 
@@ -392,7 +388,7 @@
         for (const art of articles) {
             const articleClone = art.cloneNode(true);
 
-            // Обработка видео (Заменяем на кнопку воспроизведения для мгновенной загрузки)
+            // ВИДЕО: Замена на прямое потоковое воспроизведение (Streaming)
             const videos = articleClone.querySelectorAll('video');
             videos.forEach(videoEl => {
                 const sourceEl = videoEl.querySelector('source');
@@ -406,22 +402,22 @@
                     const btn = document.createElement('button');
                     btn.className = 'play-btn';
                     btn.textContent = t('playVideo');
-                    btn.onclick = async () => {
-                        btn.textContent = "Загрузка видео...";
-                        btn.disabled = true;
-                        const blobUrl = await fetchFileBlob(matchedFile.id);
-                        if (blobUrl) {
-                            videoEl.src = blobUrl;
-                            if (sourceEl) sourceEl.src = blobUrl;
-                            btn.replaceWith(videoEl);
-                            videoEl.play();
-                        }
+                    
+                    btn.onclick = () => {
+                        // Потоковая ссылка Google API с авторизационным токеном
+                        const streamUrl = `${DRIVE_API}/files/${matchedFile.id}?alt=media&access_token=${accessToken}`;
+                        
+                        videoEl.src = streamUrl;
+                        if (sourceEl) sourceEl.src = streamUrl;
+                        
+                        btn.replaceWith(videoEl);
+                        videoEl.play().catch(e => console.log("Auto-play blocked or loading:", e));
                     };
                     videoEl.replaceWith(btn);
                 }
             });
 
-            // Картинки грузим сразу (они легкие)
+            // ИЗОБРАЖЕНИЯ: Загружаются сразу
             const images = articleClone.querySelectorAll('img');
             for (const imgEl of images) {
                 const rawSrc = imgEl.getAttribute('src');
