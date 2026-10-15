@@ -19,14 +19,11 @@
             --secondary-text: #7f91a4;
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         body {
             margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont,
-                "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background: var(--bg-color);
             color: var(--text-color);
             display: flex;
@@ -47,20 +44,8 @@
             flex-shrink: 0;
         }
 
-        .title {
-            font-weight: bold;
-            font-size: 1.1rem;
-        }
-
-        .controls {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        button, select {
-            font: inherit;
-        }
+        .title { font-weight: bold; font-size: 1.1rem; }
+        .controls { display: flex; gap: 8px; align-items: center; }
 
         .lang-toggle {
             background: #242f3d;
@@ -81,34 +66,36 @@
             font-weight: bold;
         }
 
-        button:focus-visible, a:focus-visible, select:focus-visible {
-            outline: 2px solid var(--accent-color);
-            outline-offset: 2px;
-        }
-
         #feed {
             flex: 1;
             overflow-y: auto;
             padding: 20px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 15px;
             max-width: 850px;
             margin: 0 auto;
             width: 100%;
         }
 
-        .message-card {
-            background: var(--msg-bg);
-            border-radius: 12px;
-            padding: 14px 16px;
+        article, .message-card {
+            background: var(--msg-bg) !important;
+            color: var(--text-color) !important;
+            border-radius: 12px !important;
+            padding: 16px !important;
+            margin: 0 !important;
+            box-shadow: none !important;
             overflow-wrap: anywhere;
+            line-height: 1.5;
         }
 
-        .section-title {
-            color: var(--accent-color);
-            font-weight: bold;
-            margin: 10px 0 2px;
+        article img, article video,
+        .message-card img, .message-card video {
+            display: block;
+            max-width: 100%;
+            max-height: 70vh;
+            border-radius: 8px;
+            margin-top: 10px;
         }
 
         .folder-btn {
@@ -117,90 +104,49 @@
             background: #202b36;
             color: #fff;
             border: 1px solid #2a3949;
-            padding: 13px;
+            padding: 14px;
             border-radius: 8px;
             cursor: pointer;
             font-size: 1rem;
+            font-weight: 500;
         }
 
-        .folder-btn:hover {
-            background: #29394a;
-        }
+        .folder-btn:hover { background: #29394a; }
 
         .back-btn {
             align-self: flex-start;
             background: #38495c;
             color: #fff;
             border: none;
-            padding: 9px 13px;
+            padding: 9px 14px;
             border-radius: 6px;
             cursor: pointer;
+            font-weight: bold;
         }
 
-        .file-link {
+        .nav-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .section-title {
             color: var(--accent-color);
-            display: inline-block;
-            margin-top: 9px;
-            text-decoration: none;
+            font-weight: bold;
+            margin: 10px 0 2px;
         }
 
-        .file-link:hover {
-            text-decoration: underline;
-        }
-
-        .message-card img,
-        .message-card video {
-            display: block;
-            max-width: 100%;
-            max-height: 70vh;
-            border-radius: 8px;
-            margin-top: 10px;
-        }
-
-        .muted {
-            color: var(--secondary-text);
-            font-size: 0.9rem;
-        }
-
-        .error {
-            color: #ffb4ab;
-            white-space: pre-wrap;
-        }
-
-        @media (max-width: 480px) {
-            header {
-                padding: 10px;
-            }
-
-            .title {
-                font-size: 0.95rem;
-            }
-
-            .controls {
-                gap: 5px;
-            }
-
-            .login-btn {
-                padding: 8px;
-            }
-
-            #feed {
-                padding: 12px;
-            }
-        }
+        .muted { color: var(--secondary-text); font-size: 0.9rem; }
+        .error { color: #ffb4ab; white-space: pre-wrap; }
     </style>
 </head>
 
 <body>
 <header>
     <div class="title" id="ui-title">Мастер-классы Telegram</div>
-
     <div class="controls">
-        <button class="login-btn" id="btn-login" type="button">
-            Войти
-        </button>
-
-        <select class="lang-toggle" id="lang-select" aria-label="Language">
+        <button class="login-btn" id="btn-login" type="button">Войти</button>
+        <select class="lang-toggle" id="lang-select">
             <option value="de">DE 🇩🇪</option>
             <option value="ru" selected>RU 🇷🇺</option>
         </select>
@@ -209,160 +155,78 @@
 
 <main id="feed">
     <div class="message-card" id="status-msg">
-        <div id="ui-welcome">
-            Нажмите «Войти», чтобы открыть файлы с Google Диска.
-        </div>
+        <div id="ui-welcome">Нажмите «Войти», чтобы открыть файлы с Google Диска.</div>
     </div>
 </main>
 
 <script>
-    // ==========================================
-    // 1. GOOGLE OAUTH
-    // ==========================================
-
-    const CLIENT_ID =
-        "811107839225-fnvskc6g3edktnhlv69h5rd5k9s82bfa.apps.googleusercontent.com";
-
+    const CLIENT_ID = "811107839225-fnvskc6g3edktnhlv69h5rd5k9s82bfa.apps.googleusercontent.com";
     const DRIVE_API = "https://www.googleapis.com/drive/v3";
-
-    const FOLDER_MIME =
-        "application/vnd.google-apps.folder";
-
-    const SHORTCUT_MIME =
-        "application/vnd.google-apps.shortcut";
+    const FOLDER_MIME = "application/vnd.google-apps.folder";
 
     let accessToken = null;
     let tokenClient = null;
     let currentLang = "ru";
-
-    // Стек навигации позволяет корректно возвращаться назад.
     let navigationStack = [];
-
-    // Временные URL для превью файлов.
     let objectUrls = [];
-
-    // Общие диски, доступные пользователю.
-    let availableSharedDrives = [];
 
     const i18n = {
         ru: {
             title: "Мастер-классы Telegram",
             login: "Войти",
-            loggedIn: "Вы вошли",
             logout: "Выйти",
             welcome: "Нажмите «Войти», чтобы открыть файлы с Google Диска.",
-            loading: "Загрузка файлов...",
+            loading: "Загрузка мастер-класса...",
             empty: "В этой папке ничего не найдено.",
             back: "← Назад",
-            myDrive: "📁 Мой диск",
-            sharedWithMe: "👥 Доступные мне",
-            sharedDrives: "💽 Общие диски",
-            openFile: "Открыть файл",
-            openDrive: "Открыть общий диск",
-            noSharedDrives: "Общие диски не найдены или недоступны.",
-            loginFirst: "Сначала войдите в Google.",
-            authError: "Не удалось выполнить вход",
-            loadError: "Ошибка Google Drive",
-            noPermission: "Недостаточно прав доступа",
-            previewError: "Не удалось загрузить превью файла.",
-            refresh: "Обновить",
             home: "⌂ Главная",
-            openInDrive: "Открыть на Google Диске",
-            noFiles: "Файлы не найдены.",
-            sharedUnavailable: "Не удалось загрузить общие диски"
+            myDrive: "📁 Мой диск",
+            loadError: "Ошибка Google Drive"
         },
         de: {
             title: "Masterclass Viewer",
             login: "Anmelden",
-            loggedIn: "Angemeldet",
             logout: "Abmelden",
             welcome: "Melden Sie sich an, um auf Google Drive zuzugreifen.",
-            loading: "Dateien werden geladen...",
+            loading: "Masterclass wird geladen...",
             empty: "Keine Dateien in diesem Ordner gefunden.",
             back: "← Zurück",
-            myDrive: "📁 Mein Drive",
-            sharedWithMe: "👥 Für mich freigegeben",
-            sharedDrives: "💽 Geteilte Ablagen",
-            openFile: "Datei öffnen",
-            openDrive: "Geteilte Ablage öffnen",
-            noSharedDrives: "Keine geteilten Ablagen gefunden.",
-            loginFirst: "Bitte melden Sie sich zuerst bei Google an.",
-            authError: "Anmeldung fehlgeschlagen",
-            loadError: "Google-Drive-Fehler",
-            noPermission: "Zugriff verweigert",
-            previewError: "Dateivorschau konnte nicht geladen werden.",
-            refresh: "Aktualisieren",
             home: "⌂ Startseite",
-            openInDrive: "Auf Google Drive öffnen",
-            noFiles: "Keine Dateien gefunden.",
-            sharedUnavailable: "Geteilte Ablagen konnten nicht geladen werden."
+            myDrive: "📁 Mein Drive",
+            loadError: "Google-Drive-Fehler"
         }
     };
 
     const t = key => i18n[currentLang][key] || key;
 
     window.addEventListener("load", () => {
-        document.getElementById("btn-login")
-            .addEventListener("click", handleLoginButton);
-
-        document.getElementById("lang-select")
-            .addEventListener("change", event => {
-                switchLanguage(event.target.value);
-            });
-
+        document.getElementById("btn-login").addEventListener("click", handleLoginButton);
+        document.getElementById("lang-select").addEventListener("change", e => switchLanguage(e.target.value));
         initializeGoogleAuth();
     });
 
     function initializeGoogleAuth() {
         if (!window.google?.accounts?.oauth2) {
-            setTimeout(() => {
-                if (window.google?.accounts?.oauth2) {
-                    initializeGoogleAuth();
-                } else {
-                    showError(
-                        "Google Identity Services не загрузился. Проверьте подключение к интернету."
-                    );
-                }
-            }, 1500);
-
+            setTimeout(initializeGoogleAuth, 1000);
             return;
         }
 
         tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
-
-            // Доступ только для чтения файлов.
             scope: "https://www.googleapis.com/auth/drive.readonly",
-
             callback: async response => {
-                if (response.error || !response.access_token) {
-                    showError(
-                        response.error_description ||
-                        response.error ||
-                        t("authError")
-                    );
-                    return;
+                if (response.access_token) {
+                    accessToken = response.access_token;
+                    updateLoginButton();
+                    navigationStack = [];
+                    await loadHome();
                 }
-
-                accessToken = response.access_token;
-
-                updateLoginButton();
-
-                navigationStack = [];
-
-                await loadHome();
-            },
-
-            error_callback: error => {
-                showError(error.message || t("authError"));
             }
         });
     }
 
     function handleLoginButton() {
         if (accessToken) {
-            // Локальный выход из приложения.
-            // Google-аккаунт в браузере не отключается.
             accessToken = null;
             navigationStack = [];
             clearObjectUrls();
@@ -370,476 +234,202 @@
             showWelcome();
             return;
         }
-
-        if (!tokenClient) {
-            showError("Google авторизация ещё не готова. Обновите страницу.");
-            return;
-        }
-
-        tokenClient.requestAccessToken({
-            prompt: "consent"
-        });
+        tokenClient.requestAccessToken({ prompt: "consent" });
     }
 
     function updateLoginButton() {
-        document.getElementById("btn-login").textContent =
-            accessToken ? t("logout") : t("login");
+        document.getElementById("btn-login").textContent = accessToken ? t("logout") : t("login");
     }
 
     function switchLanguage(lang) {
         currentLang = lang;
-
-        document.documentElement.lang = lang;
-
         document.getElementById("ui-title").textContent = t("title");
-        document.getElementById("lang-select").value = lang;
-
         updateLoginButton();
-
-        if (!accessToken) {
-            showWelcome();
-        }
+        if (!accessToken) showWelcome();
     }
-
-    // ==========================================
-    // 2. GOOGLE DRIVE API
-    // ==========================================
 
     async function driveRequest(url) {
-        if (!accessToken) {
-            throw new Error(t("loginFirst"));
-        }
+        const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json();
+    }
 
-        const response = await fetch(url, {
-            headers: {
-                Authorization: `Bearer ${accessToken}`
-            }
+    async function listAllFiles(q) {
+        const params = new URLSearchParams({
+            q,
+            pageSize: "1000",
+            orderBy: "name",
+            fields: "files(id,name,mimeType)"
         });
-
-        const data = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-            const message =
-                data.error?.message ||
-                `HTTP ${response.status}`;
-
-            if (response.status === 401) {
-                accessToken = null;
-                updateLoginButton();
-            }
-
-            throw new Error(message);
-        }
-
-        return data;
+        const data = await driveRequest(`${DRIVE_API}/files?${params.toString()}`);
+        return data.files || [];
     }
-
-    async function listAllFiles(options = {}) {
-        const {
-            q = "trashed = false",
-            driveId = null,
-            corpora = "user"
-        } = options;
-
-        const allFiles = [];
-        let pageToken = null;
-
-        do {
-            const params = new URLSearchParams({
-                q,
-                pageSize: "1000",
-                orderBy: "folder,name",
-                spaces: "drive",
-                corpora,
-                includeItemsFromAllDrives: "true",
-                supportsAllDrives: "true",
-                fields:
-                    "nextPageToken,files(id,name,mimeType,parents,driveId,webViewLink,shortcutDetails(targetId,targetMimeType))"
-            });
-
-            if (driveId) {
-                params.set("driveId", driveId);
-                params.set("corpora", "drive");
-            }
-
-            if (pageToken) {
-                params.set("pageToken", pageToken);
-            }
-
-            const data = await driveRequest(
-                `${DRIVE_API}/files?${params.toString()}`
-            );
-
-            allFiles.push(...(data.files || []));
-            pageToken = data.nextPageToken || null;
-
-        } while (pageToken);
-
-        return allFiles;
-    }
-
-    async function listSharedDrives() {
-        const drives = [];
-        let pageToken = null;
-
-        do {
-            const params = new URLSearchParams({
-                pageSize: "100",
-                fields: "nextPageToken,drives(id,name)"
-            });
-
-            if (pageToken) {
-                params.set("pageToken", pageToken);
-            }
-
-            const data = await driveRequest(
-                `${DRIVE_API}/drives?${params.toString()}`
-            );
-
-            drives.push(...(data.drives || []));
-            pageToken = data.nextPageToken || null;
-
-        } while (pageToken);
-
-        return drives;
-    }
-
-    // ==========================================
-    // 3. ГЛАВНАЯ СТРАНИЦА
-    // ==========================================
 
     async function loadHome() {
         showLoading();
-
         navigationStack = [];
-        availableSharedDrives = [];
+        try {
+            const rootFiles = await listAllFiles("'root' in parents and trashed = false");
+            const feed = document.getElementById("feed");
+            feed.replaceChildren();
 
-        const results = await Promise.allSettled([
-            listAllFiles({
-                q: "'root' in parents and trashed = false"
-            }),
-
-            listAllFiles({
-                q: "sharedWithMe and trashed = false"
-            }),
-
-            listSharedDrives()
-        ]);
-
-        const rootResult = results[0];
-        const sharedResult = results[1];
-        const drivesResult = results[2];
-
-        const rootFiles =
-            rootResult.status === "fulfilled" ? rootResult.value : [];
-
-        const sharedFiles =
-            sharedResult.status === "fulfilled" ? sharedResult.value : [];
-
-        availableSharedDrives =
-            drivesResult.status === "fulfilled" ? drivesResult.value : [];
-
-        // Сначала показываем главную страницу даже тогда,
-        // когда одна из категорий временно недоступна.
-        const feed = document.getElementById("feed");
-        feed.replaceChildren();
-
-        const homeButton = makeButton(t("home"), () => loadHome());
-        homeButton.className = "back-btn";
-        feed.appendChild(homeButton);
-
-        appendSection(t("myDrive"), rootFiles, {
-            type: "user"
-        });
-
-        appendSection(t("sharedWithMe"), sharedFiles, {
-            type: "user"
-        });
-
-        appendDriveSection();
-
-        if (
-            rootResult.status === "rejected" &&
-            sharedResult.status === "rejected"
-        ) {
-            showError(
-                "Не удалось загрузить файлы Google Drive.\n" +
-                rootResult.reason.message
-            );
-            return;
-        }
-
-        if (drivesResult.status === "rejected") {
-            appendMessage(
-                t("sharedUnavailable") + " " +
-                drivesResult.reason.message,
-                true
-            );
+            appendSection(t("myDrive"), rootFiles);
+        } catch (err) {
+            showError(err.message);
         }
     }
 
-    function appendSection(title, files, context) {
+    function appendSection(title, files) {
         const feed = document.getElementById("feed");
-
         const heading = document.createElement("div");
         heading.className = "section-title";
         heading.textContent = title;
         feed.appendChild(heading);
 
-        if (!files.length) {
-            const empty = document.createElement("div");
-            empty.className = "muted";
-            empty.textContent = t("noFiles");
-            feed.appendChild(empty);
-            return;
-        }
-
-        // Убираем дубли по ID.
-        const uniqueFiles = [
-            ...new Map(files.map(file => [file.id, file])).values()
-        ];
-
-        uniqueFiles.forEach(file => {
-            appendFileEntry(file, context);
-        });
-    }
-
-    function appendDriveSection() {
-        const feed = document.getElementById("feed");
-
-        const heading = document.createElement("div");
-        heading.className = "section-title";
-        heading.textContent = t("sharedDrives");
-        feed.appendChild(heading);
-
-        if (!availableSharedDrives.length) {
-            const empty = document.createElement("div");
-            empty.className = "muted";
-            empty.textContent = t("noSharedDrives");
-            feed.appendChild(empty);
-            return;
-        }
-
-        availableSharedDrives.forEach(drive => {
-            const btn = makeButton(
-                "💽 " + drive.name,
-                () => navigateTo(drive.id, {
-                    type: "drive",
-                    driveId: drive.id
-                })
-            );
-
-            btn.className = "folder-btn";
-            feed.appendChild(btn);
-        });
-    }
-
-    // ==========================================
-    // 4. НАВИГАЦИЯ ПО ПАПКАМ
-    // ==========================================
-
-    function navigateTo(folderId, context) {
-        navigationStack.push({
-            folderId,
-            context
-        });
-
-        loadFolder(folderId, context);
-    }
-
-    async function loadFolder(folderId, context = { type: "user" }) {
-        showLoading();
-
-        try {
-            let files;
-
-            if (context.type === "drive") {
-                // Корень общего диска: ID диска используется
-                // как родительский ID.
-                files = await listAllFiles({
-                    q: `'${folderId}' in parents and trashed = false`,
-                    driveId: context.driveId,
-                    corpora: "drive"
-                });
-            } else {
-                files = await listAllFiles({
-                    q: `'${folderId}' in parents and trashed = false`
-                });
+        files.forEach(file => {
+            if (file.mimeType === FOLDER_MIME) {
+                const btn = document.createElement("button");
+                btn.className = "folder-btn";
+                btn.textContent = "📁 " + file.name;
+                btn.onclick = () => navigateTo(file.id);
+                feed.appendChild(btn);
             }
+        });
+    }
 
-            renderFolder(files, folderId, context);
+    function navigateTo(folderId) {
+        navigationStack.push(folderId);
+        loadFolder(folderId);
+    }
+
+    async function loadFolder(folderId) {
+        showLoading();
+        try {
+            const files = await listAllFiles(`'${folderId}' in parents and trashed = false`);
+            const folders = files.filter(f => f.mimeType === FOLDER_MIME);
+            const htmlFile = files.find(f => f.name.toLowerCase() === 'index.html');
+
+            const feed = document.getElementById("feed");
+            feed.replaceChildren();
+
+            const navBar = document.createElement("div");
+            navBar.className = "nav-bar";
+
+            const back = document.createElement("button");
+            back.className = "back-btn";
+            back.textContent = t("back");
+            back.onclick = goBack;
+            navBar.appendChild(back);
+
+            const home = document.createElement("button");
+            home.className = "back-btn";
+            home.textContent = t("home");
+            home.onclick = loadHome;
+            navBar.appendChild(home);
+
+            feed.appendChild(navBar);
+
+            if (folders.length > 0) {
+                folders.forEach(f => {
+                    const btn = document.createElement("button");
+                    btn.className = "folder-btn";
+                    btn.textContent = "📁 " + f.name;
+                    btn.onclick = () => navigateTo(f.id);
+                    feed.appendChild(btn);
+                });
+            } else if (htmlFile) {
+                await renderMasterclassFeed(htmlFile.id, files);
+            } else {
+                renderRawFiles(files);
+            }
 
         } catch (error) {
             showError(t("loadError") + ": " + error.message);
         }
     }
 
-    function renderFolder(files, folderId, context) {
+    async function renderMasterclassFeed(htmlFileId, folderFiles) {
         const feed = document.getElementById("feed");
-        feed.replaceChildren();
 
-        const back = makeButton(t("back"), goBack);
-        back.className = "back-btn";
-        feed.appendChild(back);
+        const response = await fetch(`${DRIVE_API}/files/${htmlFileId}?alt=media`, {
+            headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        const htmlText = await response.text();
 
-        const home = makeButton(t("home"), loadHome);
-        home.className = "back-btn";
-        feed.appendChild(home);
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlText, 'text/html');
+        
+        // Достаем статьи (посты Telegram)
+        const articles = doc.querySelectorAll('article');
 
-        if (!files.length) {
-            appendMessage(t("empty"));
-            return;
+        const fileMap = new Map();
+        folderFiles.forEach(f => fileMap.set(f.name.toLowerCase(), f));
+
+        for (const art of articles) {
+            const articleClone = art.cloneNode(true);
+
+            // Обрабатываем все теги img, video, source и ссылки
+            const mediaSources = articleClone.querySelectorAll('img, source, a');
+
+            for (const el of mediaSources) {
+                let attrName = el.hasAttribute('src') ? 'src' : (el.hasAttribute('href') ? 'href' : null);
+                if (!attrName) continue;
+
+                const rawPath = el.getAttribute(attrName);
+                if (!rawPath || rawPath.startsWith('http') || rawPath.startsWith('data:')) continue;
+
+                const fileName = rawPath.split('/').pop().toLowerCase();
+                const matchedFile = fileMap.get(fileName);
+
+                if (matchedFile) {
+                    const blobUrl = await fetchFileBlob(matchedFile.id);
+                    if (blobUrl) {
+                        if (el.tagName.toLowerCase() === 'a') {
+                            el.setAttribute('href', blobUrl);
+                        } else {
+                            el.setAttribute(attrName, blobUrl);
+                            if (el.tagName.toLowerCase() === 'source' && el.parentElement) {
+                                el.parentElement.src = blobUrl;
+                            }
+                        }
+                    }
+                }
+            }
+
+            feed.appendChild(articleClone);
         }
+    }
 
-        files.forEach(file => appendFileEntry(file, context));
+    async function fetchFileBlob(fileId) {
+        try {
+            const res = await fetch(`${DRIVE_API}/files/${fileId}?alt=media`, {
+                headers: { Authorization: `Bearer ${accessToken}` }
+            });
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            objectUrls.push(url);
+            return url;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function renderRawFiles(files) {
+        const feed = document.getElementById("feed");
+        files.forEach(file => {
+            const card = document.createElement("div");
+            card.className = "message-card";
+            card.textContent = "📄 " + file.name;
+            feed.appendChild(card);
+        });
     }
 
     function goBack() {
-        // Текущая запись находится в конце стека.
         if (navigationStack.length > 1) {
             navigationStack.pop();
-
-            const previous =
-                navigationStack[navigationStack.length - 1];
-
-            loadFolder(previous.folderId, previous.context);
+            loadFolder(navigationStack[navigationStack.length - 1]);
         } else {
             loadHome();
-        }
-    }
-
-    // ==========================================
-    // 5. ОТОБРАЖЕНИЕ ПАПОК И ФАЙЛОВ
-    // ==========================================
-
-    function appendFileEntry(file, context) {
-        const feed = document.getElementById("feed");
-
-        const isShortcut = file.mimeType === SHORTCUT_MIME;
-
-        const actualMime = isShortcut
-            ? file.shortcutDetails?.targetMimeType || ""
-            : file.mimeType;
-
-        const actualId = isShortcut
-            ? file.shortcutDetails?.targetId || file.id
-            : file.id;
-
-        const isFolder = actualMime === FOLDER_MIME;
-
-        if (isFolder) {
-            const btn = makeButton(
-                "📁 " + file.name,
-                () => {
-                    const nextContext = file.driveId
-                        ? {
-                            type: "drive",
-                            driveId: file.driveId
-                        }
-                        : context;
-
-                    navigateTo(actualId, nextContext);
-                }
-            );
-
-            btn.className = "folder-btn";
-            feed.appendChild(btn);
-            return;
-        }
-
-        const card = document.createElement("div");
-        card.className = "message-card";
-
-        const title = document.createElement("b");
-        title.textContent =
-            (actualMime.startsWith("image/") ? "🖼️ " :
-            actualMime.startsWith("video/") ? "🎬 " : "📄 ") +
-            file.name;
-
-        card.appendChild(title);
-
-        const link = document.createElement("a");
-
-        link.className = "file-link";
-        link.href = file.webViewLink ||
-            `https://drive.google.com/file/d/${actualId}/view`;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        link.textContent = t("openInDrive");
-
-        card.appendChild(link);
-
-        if (
-            actualMime.startsWith("image/") ||
-            actualMime.startsWith("video/")
-        ) {
-            const previewButton = makeButton(
-                actualMime.startsWith("image/")
-                    ? "Показать изображение"
-                    : "Воспроизвести видео",
-                () => loadPreview(actualId, actualMime, card)
-            );
-
-            previewButton.className = "back-btn";
-            previewButton.style.marginTop = "10px";
-
-            card.appendChild(previewButton);
-        }
-
-        feed.appendChild(card);
-    }
-
-    // ==========================================
-    // 6. ПРЕВЬЮ ИЗОБРАЖЕНИЙ И ВИДЕО
-    // ==========================================
-
-    async function loadPreview(fileId, mimeType, card) {
-        const button = card.querySelector("button");
-        if (button) button.disabled = true;
-
-        try {
-            const response = await fetch(
-                `${DRIVE_API}/files/${encodeURIComponent(fileId)}?alt=media`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`
-                    }
-                }
-            );
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-
-            objectUrls.push(url);
-
-            let media;
-
-            if (mimeType.startsWith("image/")) {
-                media = document.createElement("img");
-                media.alt = "Превью файла";
-                media.src = url;
-            } else {
-                media = document.createElement("video");
-                media.controls = true;
-                media.preload = "metadata";
-                media.src = url;
-            }
-
-            card.appendChild(media);
-
-        } catch (error) {
-            const message = document.createElement("div");
-            message.className = "error";
-            message.textContent =
-                t("previewError") + " " + error.message;
-            card.appendChild(message);
-
-        } finally {
-            if (button) button.disabled = false;
         }
     }
 
@@ -848,72 +438,30 @@
         objectUrls = [];
     }
 
-    // ==========================================
-    // 7. ИНТЕРФЕЙС И ОШИБКИ
-    // ==========================================
-
-    function makeButton(label, onClick) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = label;
-        button.addEventListener("click", onClick);
-        return button;
-    }
-
     function showLoading() {
         const feed = document.getElementById("feed");
         feed.replaceChildren();
-
-        const message = document.createElement("div");
-        message.className = "message-card";
-        message.textContent = t("loading");
-
-        feed.appendChild(message);
+        const card = document.createElement("div");
+        card.className = "message-card";
+        card.textContent = t("loading");
+        feed.appendChild(card);
     }
 
-    function appendMessage(text, isError = false) {
-        const message = document.createElement("div");
-        message.className = "message-card";
-
-        if (isError) message.classList.add("error");
-
-        message.textContent = text;
-        document.getElementById("feed").appendChild(message);
-    }
-
-    function showError(message) {
+    function showError(msg) {
         const feed = document.getElementById("feed");
         feed.replaceChildren();
-
         const card = document.createElement("div");
         card.className = "message-card error";
-        card.textContent = message;
-
-        const retry = makeButton(t("refresh"), () => {
-            if (accessToken) loadHome();
-            else showWelcome();
-        });
-
-        retry.className = "back-btn";
-
+        card.textContent = msg;
         feed.appendChild(card);
-        feed.appendChild(retry);
-
-        console.error(message);
     }
 
     function showWelcome() {
         const feed = document.getElementById("feed");
         feed.replaceChildren();
-
         const card = document.createElement("div");
         card.className = "message-card";
-
-        const welcome = document.createElement("div");
-        welcome.id = "ui-welcome";
-        welcome.textContent = t("welcome");
-
-        card.appendChild(welcome);
+        card.textContent = t("welcome");
         feed.appendChild(card);
     }
 </script>
