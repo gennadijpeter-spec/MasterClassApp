@@ -113,8 +113,7 @@
 
         .folder-btn:hover { background: #29394a; }
 
-        .back-btn {
-            align-self: flex-start;
+        .back-btn, .play-btn {
             background: #38495c;
             color: #fff;
             border: none;
@@ -122,6 +121,12 @@
             border-radius: 6px;
             cursor: pointer;
             font-weight: bold;
+        }
+
+        .play-btn {
+            background: #2b5278;
+            margin-top: 10px;
+            display: inline-block;
         }
 
         .nav-bar {
@@ -164,7 +169,7 @@
     const DRIVE_API = "https://www.googleapis.com/drive/v3";
     const FOLDER_MIME = "application/vnd.google-apps.folder";
 
-    let accessToken = null;
+    let accessToken = localStorage.getItem("gdrive_token") || null;
     let tokenClient = null;
     let currentLang = "ru";
     let navigationStack = [];
@@ -181,7 +186,8 @@
             back: "← Назад",
             home: "⌂ Главная",
             myDrive: "📁 Мой диск",
-            loadError: "Ошибка Google Drive"
+            loadError: "Ошибка Google Drive",
+            playVideo: "▶ Воспроизвести видео"
         },
         de: {
             title: "Masterclass Viewer",
@@ -193,7 +199,8 @@
             back: "← Zurück",
             home: "⌂ Startseite",
             myDrive: "📁 Mein Drive",
-            loadError: "Google-Drive-Fehler"
+            loadError: "Google-Drive-Fehler",
+            playVideo: "▶ Video abspielen"
         }
     };
 
@@ -217,24 +224,34 @@
             callback: async response => {
                 if (response.access_token) {
                     accessToken = response.access_token;
+                    localStorage.setItem("gdrive_token", accessToken);
                     updateLoginButton();
                     navigationStack = [];
                     await loadHome();
                 }
             }
         });
+
+        // Если токен сохранен — пробуем автоматически открыть главную
+        if (accessToken) {
+            updateLoginButton();
+            loadHome();
+        }
     }
 
     function handleLoginButton() {
         if (accessToken) {
             accessToken = null;
+            localStorage.removeItem("gdrive_token");
             navigationStack = [];
             clearObjectUrls();
             updateLoginButton();
             showWelcome();
             return;
         }
-        tokenClient.requestAccessToken({ prompt: "consent" });
+        
+        // Запрашиваем вход без принудительного окна согласия каждый раз
+        tokenClient.requestAccessToken({ prompt: "" });
     }
 
     function updateLoginButton() {
@@ -250,6 +267,14 @@
 
     async function driveRequest(url) {
         const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+        if (response.status === 401) {
+            // Токен истек — просим авторизоваться заново
+            accessToken = null;
+            localStorage.removeItem("gdrive_token");
+            updateLoginButton();
+            showWelcome();
+            throw new Error("Сессия истекла. Нажмите «Войти» повторно.");
+        }
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return await response.json();
     }
@@ -348,6 +373,7 @@
         }
     }
 
+    // БЫСТРЫЙ РЕНДЕР С ЛЕНИВОЙ ЗАГРУЗКОЙ ВИДЕО
     async function renderMasterclassFeed(htmlFileId, folderFiles) {
         const feed = document.getElementById("feed");
 
@@ -358,8 +384,6 @@
 
         const parser = new DOMParser();
         const doc = parser.parseFromString(htmlText, 'text/html');
-        
-        // Достаем статьи (посты Telegram)
         const articles = doc.querySelectorAll('article');
 
         const fileMap = new Map();
@@ -368,31 +392,48 @@
         for (const art of articles) {
             const articleClone = art.cloneNode(true);
 
-            // Обрабатываем все теги img, video, source и ссылки
-            const mediaSources = articleClone.querySelectorAll('img, source, a');
+            // Обработка видео (Заменяем на кнопку воспроизведения для мгновенной загрузки)
+            const videos = articleClone.querySelectorAll('video');
+            videos.forEach(videoEl => {
+                const sourceEl = videoEl.querySelector('source');
+                const rawSrc = sourceEl ? sourceEl.getAttribute('src') : videoEl.getAttribute('src');
+                if (!rawSrc) return;
 
-            for (const el of mediaSources) {
-                let attrName = el.hasAttribute('src') ? 'src' : (el.hasAttribute('href') ? 'href' : null);
-                if (!attrName) continue;
-
-                const rawPath = el.getAttribute(attrName);
-                if (!rawPath || rawPath.startsWith('http') || rawPath.startsWith('data:')) continue;
-
-                const fileName = rawPath.split('/').pop().toLowerCase();
+                const fileName = rawSrc.split('/').pop().toLowerCase();
                 const matchedFile = fileMap.get(fileName);
 
                 if (matchedFile) {
-                    const blobUrl = await fetchFileBlob(matchedFile.id);
-                    if (blobUrl) {
-                        if (el.tagName.toLowerCase() === 'a') {
-                            el.setAttribute('href', blobUrl);
-                        } else {
-                            el.setAttribute(attrName, blobUrl);
-                            if (el.tagName.toLowerCase() === 'source' && el.parentElement) {
-                                el.parentElement.src = blobUrl;
-                            }
+                    const btn = document.createElement('button');
+                    btn.className = 'play-btn';
+                    btn.textContent = t('playVideo');
+                    btn.onclick = async () => {
+                        btn.textContent = "Загрузка видео...";
+                        btn.disabled = true;
+                        const blobUrl = await fetchFileBlob(matchedFile.id);
+                        if (blobUrl) {
+                            videoEl.src = blobUrl;
+                            if (sourceEl) sourceEl.src = blobUrl;
+                            btn.replaceWith(videoEl);
+                            videoEl.play();
                         }
-                    }
+                    };
+                    videoEl.replaceWith(btn);
+                }
+            });
+
+            // Картинки грузим сразу (они легкие)
+            const images = articleClone.querySelectorAll('img');
+            for (const imgEl of images) {
+                const rawSrc = imgEl.getAttribute('src');
+                if (!rawSrc) continue;
+
+                const fileName = rawSrc.split('/').pop().toLowerCase();
+                const matchedFile = fileMap.get(fileName);
+
+                if (matchedFile) {
+                    fetchFileBlob(matchedFile.id).then(blobUrl => {
+                        if (blobUrl) imgEl.src = blobUrl;
+                    });
                 }
             }
 
