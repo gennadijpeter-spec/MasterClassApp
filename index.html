@@ -175,6 +175,11 @@
     let navigationStack = [];
     let objectUrls = [];
 
+    // Регистрация Service Worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(err => console.log('SW reg error:', err));
+    }
+
     const i18n = {
         ru: {
             title: "Мастер-классы Telegram",
@@ -388,7 +393,7 @@
         for (const art of articles) {
             const articleClone = art.cloneNode(true);
 
-            // ВИДЕО: Быстрый запуск
+            // ПОТОКОВОЕ ВИДЕО ЧЕРЕЗ SERVICE WORKER
             const videos = articleClone.querySelectorAll('video');
             videos.forEach(videoEl => {
                 const sourceEl = videoEl.querySelector('source');
@@ -403,31 +408,15 @@
                     btn.className = 'play-btn';
                     btn.textContent = t('playVideo');
                     
-                    btn.onclick = async () => {
-                        btn.textContent = "Запуск видео...";
-                        btn.disabled = true;
+                    btn.onclick = () => {
+                        // Передаем запрос через Service Worker с параметром stream=1
+                        const streamUrl = `${DRIVE_API}/files/${matchedFile.id}?alt=media&stream=1&token=${accessToken}`;
+                        
+                        videoEl.src = streamUrl;
+                        if (sourceEl) sourceEl.src = streamUrl;
 
                         btn.replaceWith(videoEl);
-
-                        try {
-                            const res = await fetch(`${DRIVE_API}/files/${matchedFile.id}?alt=media`, {
-                                headers: { 
-                                    Authorization: `Bearer ${accessToken}`,
-                                    Range: 'bytes=0-'
-                                }
-                            });
-
-                            const blob = await res.blob();
-                            const blobUrl = URL.createObjectURL(blob);
-                            objectUrls.push(blobUrl);
-
-                            videoEl.src = blobUrl;
-                            if (sourceEl) sourceEl.src = blobUrl;
-
-                            videoEl.play();
-                        } catch (e) {
-                            console.error("Ошибка воспроизведения:", e);
-                        }
+                        videoEl.play().catch(e => console.log("Play interrupted:", e));
                     };
                     videoEl.replaceWith(btn);
                 }
